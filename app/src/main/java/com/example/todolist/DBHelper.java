@@ -7,6 +7,8 @@ import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
+import java.util.Arrays;
+
 public class DBHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "todo.db";
     private static final int DATABASE_VERSION = 1;
@@ -122,5 +124,33 @@ public class DBHelper extends SQLiteOpenHelper {
         }
         cursor.close();
         Log.d("DB_CONTENT", "\n");
+    }
+
+    public Cursor getTasksByCategoryWithSort(String category, int userId, boolean showOverdueOnly) {
+        SQLiteDatabase db = getReadableDatabase();
+
+        String selection = "t.user_id = ?";
+        String[] selectionArgs = new String[]{String.valueOf(userId)};
+
+        if (category != null && !category.equals("All")) {
+            selection += " AND c.name = ?";
+            selectionArgs = Arrays.copyOf(selectionArgs, 2);
+            selectionArgs[1] = category;
+        }
+
+        if (showOverdueOnly) {
+            selection += " AND t.due_date < date('now') AND t.is_completed = 0";
+        }
+
+        String query = "SELECT t.*, c.name as category_name " +
+                "FROM tasks t " +
+                "LEFT JOIN task_category tc ON t.id = tc.task_id " +
+                "LEFT JOIN categories c ON tc.category_id = c.id " +
+                "WHERE " + selection + " " +
+                "ORDER BY " +
+                "CASE WHEN t.due_date < date('now') AND t.is_completed = 0 THEN 0 ELSE 1 END, " + // 逾期置顶
+                "t.due_date ASC";
+
+        return db.rawQuery(query, selectionArgs);
     }
 }

@@ -9,6 +9,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.SearchView;
 import android.widget.Spinner;
@@ -32,9 +33,11 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
     private RecyclerView recyclerView;
     private TaskAdapter adapter;
-    private List<Task> taskList = new ArrayList<>();
     private DBHelper dbHelper;
     private int currentUserId;
+
+    private Spinner categorySpinner;
+    private CheckBox cbShowOverdue;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,37 +45,18 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         currentUserId = getIntent().getIntExtra("user_id", -1);
-
         dbHelper = new DBHelper(this);
+
         recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new TaskAdapter(new ArrayList<>(), this::onTaskAction, this); // 初始化空适配器
+        recyclerView.setAdapter(adapter);
 
         FloatingActionButton fab = findViewById(R.id.fab);
         fab.setOnClickListener(v -> showTaskDialog(null));
+        setupSearchUI();
 
-        loadTasks();
-    }
-
-    private void loadTasks() {
-        taskList.clear();
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-        String query = "SELECT * FROM tasks WHERE user_id = ?";
-        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(currentUserId)});
-
-        while (cursor.moveToNext()) {
-            Task task = new Task(
-                    cursor.getString(cursor.getColumnIndex("title")),
-                    cursor.getString(cursor.getColumnIndex("description")),
-                    cursor.getString(cursor.getColumnIndex("due_date"))
-            );
-            task.setId(cursor.getInt(cursor.getColumnIndex("id")));
-            taskList.add(task);
-        }
-        cursor.close();
-        dbHelper.debugDatabaseStructure();
-
-        adapter = new TaskAdapter(taskList, this::onTaskAction);
-        recyclerView.setAdapter(adapter);
+        loadTasksWithFilter();
     }
 
     private void showTaskDialog(Task existingTask) {
@@ -128,17 +112,84 @@ public class MainActivity extends AppCompatActivity {
         } else {
             db.update("tasks", values, "id=?", new String[]{String.valueOf(task.getId())});
         }
-        loadTasks();
+        loadTasksWithFilter();
     }
 
     private void onTaskAction(int position, String action) {
-        Task task = taskList.get(position);
+        Task task = adapter.getTaskAt(position);
+
         if ("delete".equals(action)) {
             dbHelper.getWritableDatabase()
                     .delete("tasks", "id=?", new String[]{String.valueOf(task.getId())});
-            loadTasks();
+            loadTasksWithFilter(); // 重新加载数据保持同步
         } else if ("edit".equals(action)) {
             showTaskDialog(task);
         }
+    }
+
+    private void setupSearchUI() {
+        categorySpinner = findViewById(R.id.spinner_category);
+        ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item,
+                getCategories());
+        categorySpinner.setAdapter(categoryAdapter);
+
+        cbShowOverdue = findViewById(R.id.cb_overdue);
+        cbShowOverdue.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            loadTasksWithFilter();
+        });
+
+        findViewById(R.id.btn_search).setOnClickListener(v -> {
+            loadTasksWithFilter();
+        });
+    }
+
+    private List<String> getCategories() {
+        List<String> categories = new ArrayList<>();
+        categories.add("All");
+        return categories;
+    }
+
+    private void loadTasksWithFilter() {
+        String selectedCategory = categorySpinner.getSelectedItem().toString();
+        if (selectedCategory.equals("All")) selectedCategory = null;
+
+        Cursor cursor = dbHelper.getTasksByCategoryWithSort(
+                selectedCategory,
+                currentUserId,
+                cbShowOverdue.isChecked()
+        );
+
+        List<Task> filteredTasks = new ArrayList<>();
+        while (cursor.moveToNext()) {
+            Task task = cursorToTask(cursor);
+            filteredTasks.add(task);
+        }
+        cursor.close();
+
+        adapter.updateTasks(filteredTasks);
+    }
+
+    private Task cursorToTask(Cursor cursor) {
+        Task task = new Task(
+                cursor.getString(cursor.getColumnIndexOrThrow("title")),
+                cursor.getString(cursor.getColumnIndexOrThrow("description")),
+                cursor.getString(cursor.getColumnIndexOrThrow("due_date"))
+        );
+
+        task.setId(cursor.getInt(cursor.getColumnIndexOrThrow("id")));
+        task.setCompleted(cursor.getInt(cursor.getColumnIndex("is_completed")) == 1);
+
+        int categoryIndex = cursor.getColumnIndex("category_name");
+        if (categoryIndex != -1) {
+            task.setCategory(cursor.getString(categoryIndex));
+        }
+
+        int priorityIndex = cursor.getColumnIndex("priority");
+        if (priorityIndex != -1) {
+            task.setPriority(cursor.getInt(priorityIndex));
+        }
+
+        return task;
     }
 }
