@@ -4,38 +4,55 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <!-- 顶部筛选栏（添加ID便于定位） -->
     <LinearLayout
+        android:id="@+id/filter_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
         android:orientation="horizontal"
-        android:padding="8dp">
+        android:padding="8dp"
+        android:background="?attr/colorPrimarySurface"
+        android:elevation="4dp">
 
         <Spinner
             android:id="@+id/spinner_category"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="3"/>
+            android:layout_weight="3"
+            android:background="@drawable/bg_spinner"
+            android:spinnerMode="dropdown"/>
 
         <CheckBox
             android:id="@+id/cb_overdue"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="2"
-            android:text="Overdue"/>
+            android:text="Overdue"
+            android:buttonTint="?attr/colorPrimary"
+            android:layout_marginHorizontal="4dp"/>
 
         <Button
             android:id="@+id/btn_search"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Search"/>
+            android:layout_weight="2"
+            android:text="Search"
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="@android:color/white"
+            android:paddingHorizontal="4dp"/>
     </LinearLayout>
 
+    <!-- RecyclerView 放置在筛选栏下方 -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_height="match_parent"
+        android:layout_below="@id/filter_bar"
+        android:clipToPadding="false"
+        android:paddingBottom="72dp"/> <!-- 为FAB留出空间 -->
 
+    <!-- 悬浮按钮 -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab"
         android:layout_width="wrap_content"
@@ -43,5 +60,7 @@
         android:layout_alignParentBottom="true"
         android:layout_alignParentEnd="true"
         android:layout_margin="16dp"
-        app:srcCompat="@android:drawable/ic_input_add"/>
+        app:backgroundTint="?attr/colorPrimary"
+        app:srcCompat="@android:drawable/ic_input_add"
+        app:tint="@android:color/white"/>
 </RelativeLayout>
