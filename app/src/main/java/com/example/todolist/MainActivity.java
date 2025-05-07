@@ -56,6 +56,8 @@ public class MainActivity extends AppCompatActivity {
         fab.setOnClickListener(v -> showTaskDialog(null));
         setupSearchUI();
 
+//        this.deleteDatabase("todo.db");
+
         loadTasksWithFilter();
     }
 
@@ -85,14 +87,48 @@ public class MainActivity extends AppCompatActivity {
                     calendar.get(Calendar.DAY_OF_MONTH)).show();
         });
 
+//        builder.setView(view)
+//                .setTitle(existingTask == null ? "create task" : "edit task")
+//                .setPositiveButton("save", (dialog, which) -> {
+//                    String dueDate = tvDate.getText().toString().replace("due: ", "");
+//                    Task task = existingTask == null ?
+//                            new Task(etTitle.getText().toString(), etDesc.getText().toString(), dueDate) :
+//                            existingTask;
+//
+//                    saveTask(task);
+//                })
+//                .setNegativeButton("cancel", null)
+//                .show();
+
+        Spinner categorySpinner = view.findViewById(R.id.spinner_category);
+
+        ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_item,
+                getCategoryNames());
+        categorySpinner.setAdapter(categoryAdapter);
+
+        if (existingTask != null && existingTask.getCategory() != null) {
+            int position = categoryAdapter.getPosition(existingTask.getCategory());
+            categorySpinner.setSelection(Math.max(position, 0));
+        }
+
         builder.setView(view)
                 .setTitle(existingTask == null ? "create task" : "edit task")
                 .setPositiveButton("save", (dialog, which) -> {
-                    String dueDate = tvDate.getText().toString().replace("due: ", "");
+                    String dueDate = tvDate.getText().toString().replace("due date: ", "");
+                    String selectedCategory = categorySpinner.getSelectedItem().toString();
+
                     Task task = existingTask == null ?
-                            new Task(etTitle.getText().toString(), etDesc.getText().toString(), dueDate) :
+                            new Task(
+                                    etTitle.getText().toString(),
+                                    etDesc.getText().toString(),
+                                    dueDate,
+                                    selectedCategory,
+                                    0
+                            ) :
                             existingTask;
 
+                    task.setCategory(selectedCategory);
                     saveTask(task);
                 })
                 .setNegativeButton("cancel", null)
@@ -107,12 +143,45 @@ public class MainActivity extends AppCompatActivity {
         values.put("description", task.getDescription());
         values.put("due_date", task.getDueDate());
 
-        if (task.getId() == 0) {
-            db.insert("tasks", null, values);
-        } else {
-            db.update("tasks", values, "id=?", new String[]{String.valueOf(task.getId())});
+        try {
+            db.beginTransaction();
+
+            long taskId;
+            if (task.getId() == 0) {
+                taskId = db.insert("tasks", null, values);
+                task.setId((int) taskId);
+            } else {
+                db.update("tasks", values, "id=?", new String[]{String.valueOf(task.getId())});
+                taskId = task.getId();
+            }
+
+            updateTaskCategory(db, taskId, task.getCategory());
+
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
         }
         loadTasksWithFilter();
+    }
+
+
+    private void updateTaskCategory(SQLiteDatabase db, long taskId, String categoryName) {
+        db.delete("task_category", "task_id=?", new String[]{String.valueOf(taskId)});
+
+        if (categoryName != null && !categoryName.equals("No Category")) {
+            Cursor cursor = db.rawQuery(
+                    "SELECT id FROM categories WHERE name=?",
+                    new String[]{categoryName});
+
+            if (cursor.moveToFirst()) {
+                int categoryId = cursor.getInt(0);
+                ContentValues cv = new ContentValues();
+                cv.put("task_id", taskId);
+                cv.put("category_id", categoryId);
+                db.insert("task_category", null, cv);
+            }
+            cursor.close();
+        }
     }
 
     private void onTaskAction(int position, String action) {
@@ -121,7 +190,7 @@ public class MainActivity extends AppCompatActivity {
         if ("delete".equals(action)) {
             dbHelper.getWritableDatabase()
                     .delete("tasks", "id=?", new String[]{String.valueOf(task.getId())});
-            loadTasksWithFilter(); // 重新加载数据保持同步
+            loadTasksWithFilter();
         } else if ("edit".equals(action)) {
             showTaskDialog(task);
         }
@@ -168,6 +237,8 @@ public class MainActivity extends AppCompatActivity {
         cursor.close();
 
         adapter.updateTasks(filteredTasks);
+
+        dbHelper.debugDatabaseStructure();
     }
 
     private Task cursorToTask(Cursor cursor) {
@@ -191,5 +262,20 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return task;
+    }
+
+    private List<String> getCategoryNames() {
+        List<String> categories = new ArrayList<>();
+        categories.add("No Category");
+
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT name FROM categories", null);
+
+        while (cursor.moveToNext()) {
+            categories.add(cursor.getString(0));
+        }
+        cursor.close();
+
+        return categories;
     }
 }

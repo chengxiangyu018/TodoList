@@ -1,5 +1,6 @@
 package com.example.todolist;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -57,6 +58,19 @@ public class DBHelper extends SQLiteOpenHelper {
             db.execSQL(CREATE_CATEGORIES_TABLE);
             db.execSQL(CREATE_TASK_CATEGORY_JUNCTION);
             db.execSQL("CREATE INDEX idx_due_date ON tasks(due_date)");
+
+            ContentValues cv = new ContentValues();
+            cv.put("name", "Work");
+            cv.put("color", "#FF5722");
+            db.insert("categories", null, cv);
+
+            cv.put("name", "Study");
+            cv.put("color", "#4CAF50");
+            db.insert("categories", null, cv);
+
+            cv.put("name", "Life");
+            cv.put("color", "#2196F3");
+            db.insert("categories", null, cv);
             Log.d("DB", "create success");
         } catch (SQLiteException e) {
             Log.e("DB", "Create failed", e);
@@ -141,14 +155,13 @@ public class DBHelper extends SQLiteOpenHelper {
         if (showOverdueOnly) {
             selection += " AND t.due_date < date('now') AND t.is_completed = 0";
         }
-
         String query = "SELECT t.*, c.name as category_name " +
                 "FROM tasks t " +
                 "LEFT JOIN task_category tc ON t.id = tc.task_id " +
                 "LEFT JOIN categories c ON tc.category_id = c.id " +
                 "WHERE " + selection + " " +
                 "ORDER BY " +
-                "CASE WHEN t.due_date < date('now') AND t.is_completed = 0 THEN 0 ELSE 1 END, " + // 逾期置顶
+                "CASE WHEN t.due_date < date('now') AND t.is_completed = 0 THEN 0 ELSE 1 END, " +
                 "t.due_date ASC";
 
         return db.rawQuery(query, selectionArgs);
