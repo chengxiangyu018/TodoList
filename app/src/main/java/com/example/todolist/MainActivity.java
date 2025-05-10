@@ -200,7 +200,7 @@ public class MainActivity extends AppCompatActivity {
         categorySpinner = findViewById(R.id.spinner_category);
         ArrayAdapter<String> categoryAdapter = new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_item,
-                getCategories());
+                getCategoryNames());
         categorySpinner.setAdapter(categoryAdapter);
 
         cbShowOverdue = findViewById(R.id.cb_overdue);
@@ -279,3 +279,6 @@ public class MainActivity extends AppCompatActivity {
         return categories;
     }
 }
+
+
+
